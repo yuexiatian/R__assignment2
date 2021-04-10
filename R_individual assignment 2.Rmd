@@ -1,0 +1,264 @@
+---
+output: pdf_document
+geometry: margin = 0.75in
+---
+
+```{r RMarkdown setup., include = FALSE}
+knitr::opts_knit$set(root.dir = getwd())
+display <- FALSE
+```
+
+## Data Set Information
+
+This assignment chiefly concerns lightly edited versions of data released by the United States government;
+tornadoes, from the National Weather Service, www.spc.noaa.gov, 
+and states, from the Census Bureau, www.census.gov.
+
+The tornadoes data set contains records of all tornadoes to hit US soil since 1950, organised by state.
+
+Here,num indexes tornadoes per year; if a specific num value occurs more than once per year, that means a tornado crossed state borders; 
+
+magnitude records a tornado’s severity, on a scale of 0 (weakest) to 5 (strongest); -9 indicates missing data.
+
+The crop_loss variable indicates crop losses in millions of dollars, collected from 2007 onwards; property_loss similarly indicates property damage in millions of dollars, but only from 1996 onwards. Before then, damage was measured in categories, ranging from 1 (least) to 8 (worst).Throughout both columns, a 0 indicates missing data.
+
+The states data set lists the populations of all US states since 1900, recorded in thousands of individuals.
+
+The state_codes data set, finally, relates the official abbreviations of US states to their full names.
+
+
+```{r loading libraries, include = FALSE}
+library(tidyverse)
+library(caret)
+install.packages("dplyr")
+library(dplyr)
+```
+
+```{r loading data sets}
+tornadoes <- read.delim("input/tornadoes.txt", stringsAsFactors = FALSE)
+states <- read.delim("input/states.txt", stringsAsFactors = FALSE)
+state_codes <- read.delim("input/state_codes.txt", stringsAsFactors = FALSE)
+```
+
+##### Question 1 
+Create a copy of the tornado dataset that includes only records where both injuries and fatalities were 0, and where the data for crop_loss is not missing. Sort this data set byyr, oldest to newest,and then crop_loss, worst to least. Create this object with a meaningful name initially, then copy it into an object called answer1.
+
+```{r, results = "hide", echo = display}
+
+tornadoes1 <- tornadoes %>%
+  filter(injuries == 0, fatalities == 0, crop_loss != 0) %>%
+  arrange(yr, desc(crop_loss))
+
+answer1 <- tornadoes1
+```
+
+
+##### Question 2 
+Using ggplot, create a line graph which shows the population of the state of Maineover time. The x-axis should be labelled “Year” and the y-axis “Population of Maine”. The y-axis should show the population in real numbers, so not in thousands, and should run from 0.6 million to 1.5 million, with tick marks labelled "0.6 million","0.9 million","1.2 million"and"1.5 million"at the correct locations. Store this plot in an object called answer2.
+
+```{r, results = "hide", echo = display}
+
+maine_population <- ggplot(data = states, aes(x = Year, y = Maine * 1000)) +
+  geom_line() +
+  scale_x_continuous(name = "Year") +
+  scale_y_continuous(limits = c(600000, 1500000), name = "Population of Maine",
+                     breaks = c(600000, 900000, 1200000, 1500000),
+                     labels = c("0.6 million", "0.9 million", "1.2 million",
+                                "1.5 million"))
+
+answer2 <- maine_population
+```
+
+
+##### Question 3 
+Using ggplot, create a barplot which shows the number of tornadoes per yr, with the number of tornadoes of each magnitude shown by the color of the bars. A magnitude of-9 should show as "#D8D5D9",and magnitudes of 0 through 5 should show as "#EFF3FF", "#C6DBEF", "#9ECAE1", "#6BAED6", "#3182BD" and "#08519C", respectively. Ensure the legend title is "magnitude" and leave the axes at their defaults. Apply the dark theme. Store this plot in an object called answer3.
+
+```{r, echo = display}
+
+tornadoes3 <- tornadoes 
+plotting <- ggplot(data = tornadoes3, 
+                   aes(x = yr, fill = as.factor(magnitude))) +
+  geom_bar() + 
+  scale_fill_manual(values = c("-9" = "#D8D5D9", "0" = "#EFF3FF",
+                                "1" = "#C6DBEF", "2" = "#9ECAE1", 
+                                "3" = "#6BAED6", "4" = "#3182BD",
+                                "5" = "#08519C")) +
+  guides(fill = guide_legend(title = "magnitude")) +
+  theme_dark()
+
+answer3 <- plotting
+```
+
+
+##### Question 4 
+Create a copy of the states data set and create a function to change all the population counts into real numbers, instead of in thousands, rounded off to three significant figures. In addition, shorten the Year column so that 1954 becomes 54, and 2016 becomes16, and so on. Create this object with a meaningful name initially, then copy it into an object called answer4.
+
+```{r, echo = display}
+
+states4 <- states
+real_numbers <- function(a_vector) {
+  a_vector <- signif(a_vector * 1000, 3)
+  a_vector
+}
+year_rn <- mutate_at(states4, vars(Alabama : Wyoming),
+                     list(real_numbers))
+year_rn$Year <- as.factor(substr(as.character(year_rn$Year), 
+                                 start = 3, stop = 4))
+
+answer4 <- year_rn
+```
+
+
+##### Question 5 
+Using ggplot, create a barplot with two bars,fatalities and injuries, where the heights of the bars show the total number of fatalities and injuriesfor the year 1984, respectively, as recorded in the tornadoes data set. Label the x-axis"statistic" and the y-axis"total_cost". Store this plot in an object called answer5.
+
+```{r, results = "hide", echo = display}
+
+tornadoes5 <- tornadoes %>%
+  group_by(yr) %>%
+  summarise(fatalities = sum(fatalities), 
+            injuries = sum(injuries)) %>%
+  filter(yr == 1984) %>%
+  pivot_longer(!yr, names_to = "casualties", values_to = "count") %>%
+  ggplot(aes(x = casualties, y = count)) +
+  geom_bar(stat = "identity") +
+  scale_x_discrete(name = "statistic") +
+  scale_y_continuous(name = "total_cost") 
+
+answer5 <- tornadoes5  
+```
+
+
+##### Question 6 
+This code generates some example true and predicted data. Copy it and use caretto create a confusionMatrix()for it, with “Yes” as the reference level. Extract Precision as a named vector and store it in an object called answer6.
+
+```{r, echo = display, cache = TRUE}
+
+set.seed(1)
+true_values <-sample(c("Yes", "No"), 10000, replace = TRUE,
+                     prob =c(0.3, 0.7))
+
+predicted_values <- true_values
+predicted_values[sample.int(10000, 4000)] <-
+  sample(c("Yes", "No"), 4000, replace = TRUE, prob =c(0.3, 0.7))
+
+confM <- caret::confusionMatrix(data = as.factor(predicted_values), 
+                                reference = as.factor(true_values),
+                                positive = "Yes")
+precision <- confM$byClass["Pos Pred Value"]
+
+answer6 <- precision
+```
+
+
+##### Question 7 
+Create a copy of the tornadoes data set and turn fatalities into a discrete variable in that copy; it should read"Yes"if there were any fatalities, and"No"otherwise. Use set.seed(1)at the very start of your solution. Then draw a random sample of 1000 observations - do not balance by the outcome variable - and use caretto fit a knn model predicting fatalities on the basis of magnitude and time; adapt the model to use repeated cv with 3 repeats, the default number of folds and a sequence of odd numbers from 5 up to and including15 for the value of k; leave train()'s options at their defaults otherwise.Contrast this unbalanced model with a balanced model created following the same steps, but selecting the first 500cases with fatalities and the first 500 case without fatalities from the dataset rather than a random sample. From the knn objects resulting from the train() calls, retain their respective k and Accuracy columns. In the final answer object, subtract (pairwise) the difference in Accuracy per k, so that the resulting dataframe shows the overestimation of accuracy by an unbalanced model, per level of k. Retain the column names. Create this object with a meaningful name initially, then store it in an object called answer7.
+
+```{r, echo = display, cache = TRUE, warning = FALSE}
+
+set.seed(1)
+tornadoes7 <- tornadoes
+tornadoes7$fatalities[tornadoes7$fatalities == 0] <- "No"
+tornadoes7$fatalities[tornadoes7$fatalities != "No"] <- "Yes"
+tornadoes7$fatalities <- as.factor(tornadoes7$fatalities)
+
+sample_random <- sample_n(tornadoes7, 1000)
+trctrl <- trainControl(method = "repeatedcv", repeats = 3)
+fatalities_knn1 <- train(fatalities ~ magnitude + time,
+                        data = sample_random, method = "knn",
+                        trControl = trctrl,
+                        tuneGrid = data.frame(k = seq(5, 15, by = 2))
+)
+
+yes_500 <- tornadoes7 %>%
+  filter(fatalities == "Yes") %>%
+  slice(1:500)
+no_500 <- tornadoes7 %>%
+  filter(fatalities == "No") %>%
+  slice(1:500)
+sample_balanced <- bind_rows(yes_500, no_500)
+trctrl <- trainControl(method = "repeatedcv", repeats = 3)
+fatalities_knn2 <- train(fatalities ~ magnitude + time,
+                         data = sample_balanced, method = "knn",
+                         trControl = trctrl,
+                         tuneGrid = data.frame(k = seq(5, 15, by = 2))
+)
+result_random <- fatalities_knn1$results[ , 1:2]
+result_balanced <- fatalities_knn2$results[ , 1:2]
+result_random[2] <- result_random[2] - result_balanced[2]
+
+answer7 <- result_random
+```
+
+##### Question 8 - 1 point
+Create a function which accepts as its arguments a data frame, a string, and a string. Assume that the data frame is the tornadoes data set, that the first string is a valid value for the state variable in the tornadoes data set, and that the second string is a valid R color. The function should create a scatter plot with magnitude on the x-axis and injuries on the y-axis, for all tornadoes from that state. 
+
+The points should be diamonds of size 3 with black edges, with their insides the color of the second string supplied to the function. If no color is supplied, the default should be"dark green". The points should be randomly scattered a bit so they do not overlap. Add a title centered above the plot, which reads “Tornadoes in X”, where X is the full name of the state supplied to the function. Use the state_codes object to derive the correct full name to use.Color this title according to the color supplied to the function. Save the function as an object called answer8. 
+
+```{r, echo = FALSE, cache = FALSE, warning = FALSE, hide = TRUE}
+
+plot_tornadoes <- function(dataframe, a_state, a_color = "darkgreen") {
+  dataframe1 <- filter(dataframe, state == a_state)
+  ggplot(dataframe1, aes(x = magnitude, y = injuries)) + 
+    geom_point(shape = 23, fill = a_color, color = "black", size = 3,
+             position = "jitter") +
+    ggtitle(paste("Tornadoes in", 
+                  state_codes$Name[which(state_codes$Abbreviation == a_state)])
+            ) +
+    theme(plot.title = element_text(hjust = 0.5, color = a_color)) 
+}
+
+answer8 <- plot_tornadoes
+```
+
+
+##### Question 9 
+Using tornadoes,states and state_codes, create a copy of the tornadoes data set that is identical to it except for the addition of a new column,population, that contains the population of the state in the yr of the observation. Create this object with a meaningful name initially, then store it in an object called answer9. 
+
+```{r}
+state_code9 <- state_code %>%
+  slice(-2, -11) %>%
+  add_row(Name = "District of Columbia", Abbreviation = "DC")
+states9 <- states %>%
+  relocate(District.Of.Columbia, .after = last_col()) %>%
+  rename(yr = Year)
+
+colnames(states9)[2:50] <- state_code9[, 2]
+states_long <- pivot_longer(states9, 
+                        cols = (AL : DC), 
+                        names_to = "state", 
+                        values_to = "population")
+tornadoes9 <- tornadoes
+left_join(tornadoes9, states_long, by = c("yr", "state"))
+
+answer9 <- tornadoes9
+```
+
+
+##### Question 10 
+Create a copy of tornadoes and apply functions that fix these two issues: For both property_loss and crop_loss,missing data should be indicated by -9, and damage should be expressed in categories. Up until $50, the damagecategory is 1; then up until $500, it is 2, and so on, as defined in categorise_losses(). You may use or adapt this function if you wish. Create this object with a meaningful name initially, then copy it into an object called answer10.
+
+```{r, echo = FALSE, cache = TRUE, warning = FALSE, hide = TRUE}
+
+categorise_losses <- function(a_vector) {
+  a_vector = case_when(
+    a_vector >= 0 & a_vector < 50 ~ 1,
+    a_vector >= 50 & a_vector < 500 ~ 2,
+    a_vector >= 500 & a_vector < 5000 ~ 3,
+    a_vector >= 5000 & a_vector < 50000 ~ 4,
+    a_vector >= 50000 & a_vector < 500000 ~ 5,
+    a_vector >= 500000 & a_vector < 5000000 ~ 6,
+    a_vector >= 5000000 & a_vector < 50000000 ~ 7,
+    a_vector >= 50000000 & a_vector < 500000000 ~ 8)
+  a_vector
+}
+
+tornadoes10[49643:61598, 10] <- 
+  categorise_losses(tornadoes10[49643:61598, 10])
+tornadoes10[35677:61598, 11] <- 
+  categorise_losses(tornadoes10[35677:61598, 11])
+tornadoes10$crop_loss[is.na(tornadoes10$crop_loss)] = -9
+tornadoes10$property_loss[is.na(tornadoes10$property_loss)] = -9
+
+answer10 <- tornadoes10
+
